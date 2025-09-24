@@ -1,5 +1,7 @@
+import { input, select } from "@inquirer/prompts";
 import { Client } from "@modelcontextprotocol/sdk/client";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { Tool } from "@modelcontextprotocol/sdk/types.js";
 
 const mcp = new Client({
     name: "test-client",
@@ -18,12 +20,58 @@ const transport = new StdioClientTransport({
 
 async function main() {
     await mcp.connect(transport)
-    const [{tools}, {prompts}, {resources}, {resourceTemplates}] = await Promise.all ([
+    const [{ tools }, { prompts }, { resources }, { resourceTemplates }] = await Promise.all([
         mcp.listTools(),                              // we're getting everything the server has
         mcp.listPrompts(),                            // and putting them into config objects
         mcp.listResources(),
-        mcp.listResourceTemplates()                   
+        mcp.listResourceTemplates()
     ])
+
+    console.log("Connected")
+    while (true) {
+        const option = await select({
+            message: "What do you want to do?",
+            choices: ["Query", "Tools", "Resources", "Prompts"]
+        })  // for now this is outputting to the console
+
+        switch (option) {
+            case "Tools": {
+                const toolName = await select({
+                    message: "Select a tool",
+                    choices: tools.map(tool => ({      // get list of tools and display
+                        name: tool.annotations?.title || tool.name,
+                        value: tool.name,
+                        description: tool.description
+                    }))
+                })
+                const tool = tools.find(tool => tool.name === toolName)
+                if (tool == null) {
+                    console.error("Tool not found")
+                } else {
+                    await handleTool(tool)
+                }
+                break
+            }
+        }
+    }
 }
 
-main();
+async function handleTool(tool: Tool) {
+    const args: Record<string, string> = {}
+    for (const [key, value] of Object.entries(tool.inputSchema.properties ?? {})) {
+        args[key] = await input({
+            message: `Enter value for ${key} (${(value as { type: string }).type}):`
+            // looping through the params defined on the server and asking for input
+        })
+    }
+
+    const res = await mcp.callTool({
+        name: tool.name,
+        arguments: args
+    })  // parse out what was obtained from the args above
+
+    console.log((res.content as [{ text: string }])[0].text)
+}
+
+
+main()
