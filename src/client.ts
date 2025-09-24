@@ -2,6 +2,7 @@ import { input, select } from "@inquirer/prompts";
 import { Client } from "@modelcontextprotocol/sdk/client";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { Tool } from "@modelcontextprotocol/sdk/types.js";
+import { describe } from "node:test";
 
 const mcp = new Client({
     name: "test-client",
@@ -52,6 +53,33 @@ async function main() {
                 }
                 break
             }
+
+            case "Resources": {
+                const resourceUri = await select({
+                    message: "Select a resource",
+                    choices: [
+                    ...resources.map(resource => ({
+                        name: resource.name,
+                        value: resource.uri,
+                        description: resource.description
+                    })),
+                    ...resourceTemplates.map(template => ({
+                        name: template.name,
+                        value: template.uriTemplate,
+                        description: template.description
+                    })),
+                ],
+                })
+                const uri = 
+                  resources.find(resource => resource.uri === resourceUri)?.uri ?? 
+                  resourceTemplates.find(template => template.uriTemplate === resourceUri)?.uriTemplate
+                if (uri == null) {
+                    console.error("Resource not found")
+                } else {
+                    await handleResource(uri)
+                }
+                break
+            }
         }
     }
 }
@@ -73,5 +101,27 @@ async function handleTool(tool: Tool) {
     console.log((res.content as [{ text: string }])[0].text)
 }
 
+async function handleResource(uri: string) {
+    let finalUri = uri
+    const paramMatches = uri.match(/{([^}]+)}/g)
+
+    if (paramMatches != null) {
+    for (const paramMatch of paramMatches) {
+        const paramName = paramMatch.replace("{", "").replace("}", "")
+        const paramValue = await input({
+            message: `Enter value for ${paramName.slice(1, -1)}:`
+        })
+        finalUri = finalUri.replace(paramMatch, paramValue)
+    }
+}
+
+    const res = await mcp.readResource({
+        uri: finalUri
+    })  // parse out what was obtained from the args above
+
+    console.log(
+        JSON.stringify(JSON.parse(res.contents[0].text as string), null, 2)
+    )
+}
 
 main()
