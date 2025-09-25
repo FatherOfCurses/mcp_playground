@@ -23,8 +23,10 @@
     "zod": "^3.25.76"
   },
   "dependencies": {
+    "@ai-sdk/google": "^2.0.16",
     "@inquirer/prompts": "^7.8.6",
     "@modelcontextprotocol/sdk": "^1.13.1",
+    "ai": "^5.0.51",
     "dotenv": "^17.2.2"
   }
 }
